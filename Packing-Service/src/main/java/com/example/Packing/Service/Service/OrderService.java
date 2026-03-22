@@ -100,9 +100,6 @@ public class OrderService {
 
     private void processItems(Integer counterId) {
         try {
-            messagingTemplate.convertAndSend("/topic/counter-updates", totalItemsInQueue.get() + "-Counter " + counterId + " is busy.");
-            Thread.sleep((long) (processingTime - (helperService.getNoOfHelpers() * helperCoeff) * 1000));
-
             synchronized (this) {
                 if (totalItemsInQueue.get() <= 0) {
                     System.out.println("No items to process.");
@@ -112,7 +109,11 @@ public class OrderService {
                 processedItems.incrementAndGet();
             }
 
+            // simulate processing after reserving the item
+            messagingTemplate.convertAndSend("/topic/counter-updates", totalItemsInQueue.get() + "-Counter " + counterId + " is busy.");
+            Thread.sleep((long) (processingTime - (helperService.getNoOfHelpers() * helperCoeff) * 1000));
             messagingTemplate.convertAndSend("/topic/counter-updates", totalItemsInQueue.get() + "-Counter " + counterId + " is free");
+
             processOrders();
 
         } catch (InterruptedException e) {
@@ -120,6 +121,7 @@ public class OrderService {
             System.out.println("Item processing interrupted.");
         }
     }
+
 
     private synchronized void processOrders() {
         for (Iterator<Order> iterator = orderQueue.iterator(); iterator.hasNext();) {
