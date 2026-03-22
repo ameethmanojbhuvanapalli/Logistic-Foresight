@@ -101,7 +101,8 @@ public class CounterService {
                     }
                 }
             }
-            return -1; // This should not be reached because semaphore.acquire() ensures a counter is available
+            semaphore.release();
+            return -1;
         });
     }
 

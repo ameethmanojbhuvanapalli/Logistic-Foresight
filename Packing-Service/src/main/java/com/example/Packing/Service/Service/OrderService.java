@@ -1,6 +1,5 @@
 package com.example.Packing.Service.Service;
 
-import com.example.Packing.Service.DTO.CounterRequestDTO;
 import com.example.Packing.Service.Entity.Order;
 import com.example.Packing.Service.Repository.OrderRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -11,7 +10,6 @@ import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -27,7 +25,7 @@ public class OrderService {
 
     @Value("${helper.coeff}")
     private double helperCoeff;
-    private final Queue<Order> orderQueue = new ConcurrentLinkedQueue<>();
+    private final BlockingQueue<Order> orderQueue = new LinkedBlockingQueue<>();
     private final HashMap<Order, Integer> orderRequirements = new HashMap<>(); // To track item requirements per order
     private final AtomicInteger totalOrdersInQueue = new AtomicInteger(0);
     private final AtomicInteger totalItemsInQueue = new AtomicInteger(0);
@@ -74,6 +72,10 @@ public class OrderService {
                     if (totalItemsInQueue.get() > 0) {
                         Future<Integer> futureCounter = counterService.acquireCounterAsync(); // Acquire a counter
                         Integer counterId = futureCounter.get(); // Blocking call to get the counter ID
+                        if (counterId == null || counterId == -1) {
+                            Thread.sleep(100);
+                            continue;
+                        }
 
                         counterService.executorService.submit(() -> {
                             try {
