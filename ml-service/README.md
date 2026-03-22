@@ -6,11 +6,11 @@ Single Flask service hosting all 4 ML models for the Logistic Foresight project.
 
 | Method | Path | Service | Description |
 |--------|------|---------|-------------|
-| POST | `/packing/predict-counters` | Counter | Predict packing counters needed |
-| POST | `/packing/reload-model` | Counter | Reload pkl from disk |
-| POST | `/packing/predict-orders` | Forecast | Prophet order forecast from MongoDB |
-| POST | `/delivery/cluster-orders` | Clustering | HAC cluster orders by location |
-| POST | `/delivery/get-route` | Routing | Genetic TSP optimal route |
+| POST | `/counter/predict-counters` | Counter | Predict packing counters needed |
+| POST | `/counter/reload-model` | Counter | Reload pkl from disk |
+| POST | `/forecast/forecast-orders` | Forecast | Prophet order forecast from MongoDB |
+| POST | `/cluster/cluster-orders` | Clustering | HAC cluster orders by location |
+| POST | `/route/get-route` | Routing | Genetic TSP optimal route |
 | GET  | `/health` | — | Health check |
 
 ## Project Structure
