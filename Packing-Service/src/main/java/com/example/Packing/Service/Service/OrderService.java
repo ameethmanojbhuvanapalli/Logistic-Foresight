@@ -15,20 +15,19 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Service
 public class OrderService {
 
-    @Value("${max.threads}")
-    private int maxThreads;
-
     @Value("${item.processing.time}")
     private int processingTime;
 
     @Value("${helper.coeff}")
     private double helperCoeff;
+
     private final BlockingQueue<Order> orderQueue = new LinkedBlockingQueue<>();
-    private final ConcurrentHashMap<Order, Integer> orderRequirements = new ConcurrentHashMap<>(); // To track item requirements per order
+    private final ConcurrentHashMap<Order, Integer> orderRequirements = new ConcurrentHashMap<>();
     private final AtomicInteger totalOrdersInQueue = new AtomicInteger(0);
     private final AtomicInteger totalItemsInQueue = new AtomicInteger(0);
     private final AtomicInteger processedItems = new AtomicInteger(0);
     private final Semaphore itemsAvailable = new Semaphore(0);
+    private final ExecutorService itemProcessorPool = Executors.newCachedThreadPool();
 
     @Autowired
     private CounterService counterService;
@@ -53,12 +52,12 @@ public class OrderService {
         orderQueue.add(order);
         totalOrdersInQueue.incrementAndGet();
         totalItemsInQueue.addAndGet(order.getItemQty());
-        orderRequirements.put(order, order.getItemQty()); // Initialize the order requirement in the map
+        orderRequirements.put(order, order.getItemQty());
 
         System.out.println(totalOrdersInQueue + "-" + totalItemsInQueue);
         System.out.println("Order " + order.getOrderId() + " added to queue.");
 
-        itemsAvailable.release(order.getItemQty()); // signal that items are available
+        itemsAvailable.release(order.getItemQty());
 
         messagingTemplate.convertAndSend("/topic/order-updates", totalOrdersInQueue + "-" + totalItemsInQueue);
 
@@ -69,27 +68,28 @@ public class OrderService {
         Executors.newSingleThreadExecutor().submit(() -> {
             while (true) {
                 try {
-                    itemsAvailable.acquire(); // blocks until an item is available, no busy-wait
+                    itemsAvailable.acquire();
 
-                    Future<Integer> futureCounter = counterService.acquireCounterAsync();
-                    Integer counterId = futureCounter.get();
-
-                    if (counterId == null || counterId == -1) {
-                        itemsAvailable.release(); // put the permit back
-                        continue;
-                    }
-
-                    counterService.executorService.submit(() -> {
+                    itemProcessorPool.submit(() -> {
                         try {
+                            Future<Integer> futureCounter = counterService.acquireCounterAsync();
+                            Integer counterId = futureCounter.get();
+
+                            if (counterId == null || counterId == -1) {
+                                itemsAvailable.release();
+                                return;
+                            }
+
                             processItems(counterId);
                             counterService.releaseCounterAsync(counterId).get();
                             System.out.println("Counter " + counterId + " has been released.");
+
                         } catch (InterruptedException | ExecutionException e) {
                             System.out.println("Error processing item: " + e.getMessage());
                         }
                     });
 
-                } catch (InterruptedException | ExecutionException e) {
+                } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
                     System.out.println("Processing interrupted.");
                     break;
@@ -99,64 +99,48 @@ public class OrderService {
     }
 
     private void processItems(Integer counterId) {
-        synchronized (this) { // Ensure thread-safe access to shared state
-            if (totalItemsInQueue.get() <= 0) {
-                System.out.println("No items to process.");
-                return; // Exit if there are no items left
-            }
-        }
         try {
-            // Simulate item processing
-            String message = totalItemsInQueue.get()+"-"+"Counter " + counterId + " is busy.";
-            messagingTemplate.convertAndSend("/topic/counter-updates", message);
-            Thread.sleep((long) (processingTime-(helperService.getNoOfHelpers() * helperCoeff)*1000));  // Adjust processing time as needed
-            // Decrement items in the queue and increment processed items
-            synchronized (this) { // Use synchronized block for thread safety
+            messagingTemplate.convertAndSend("/topic/counter-updates", totalItemsInQueue.get() + "-Counter " + counterId + " is busy.");
+            Thread.sleep((long) (processingTime - (helperService.getNoOfHelpers() * helperCoeff) * 1000));
+
+            synchronized (this) {
+                if (totalItemsInQueue.get() <= 0) {
+                    System.out.println("No items to process.");
+                    return;
+                }
                 totalItemsInQueue.decrementAndGet();
                 processedItems.incrementAndGet();
             }
-            messagingTemplate.convertAndSend("/topic/counter-updates", totalItemsInQueue.get()+"-"+"Counter " + counterId + " is free");
 
-
-            // Process orders after item processing
+            messagingTemplate.convertAndSend("/topic/counter-updates", totalItemsInQueue.get() + "-Counter " + counterId + " is free");
             processOrders();
 
         } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();  // Handle interruption
+            Thread.currentThread().interrupt();
             System.out.println("Item processing interrupted.");
         }
     }
 
-
-
-
     private synchronized void processOrders() {
-        // Iterate over the order queue and allow orders to pick items
         for (Iterator<Order> iterator = orderQueue.iterator(); iterator.hasNext();) {
             Order order = iterator.next();
-            int requiredItems = orderRequirements.get(order); // Get the required item quantity from the map
+            int requiredItems = orderRequirements.get(order);
 
             while (requiredItems > 0 && processedItems.get() > 0) {
-                // Check if items are available for picking
-                if (processedItems.get() > 0) {
-                    requiredItems--; // Decrease the temporary item requirement
-                    processedItems.decrementAndGet(); // Decrease the total item count
-                    System.out.println("Order " + order.getOrderId() + " picked an item. Remaining: " + requiredItems);
+                requiredItems--;
+                processedItems.decrementAndGet();
+                System.out.println("Order " + order.getOrderId() + " picked an item. Remaining: " + requiredItems);
+                orderRequirements.put(order, requiredItems);
 
-                    // Update the map with the new requirement
-                    orderRequirements.put(order, requiredItems);
-
-                    // If the order is satisfied, complete the order
-                    if (requiredItems == 0) {
-                        try {
-                            completeOrder(order); // Complete the order
-                        } catch (JsonProcessingException e) {
-                            System.out.println("Error: " + e);
-                        }
-                        iterator.remove(); // Remove the order from the queue
-                        orderRequirements.remove(order); // Remove the order from the map as well
-                        System.out.println("Order " + order.getOrderId() + " is completed and removed from the queue.");
+                if (requiredItems == 0) {
+                    try {
+                        completeOrder(order);
+                    } catch (JsonProcessingException e) {
+                        System.out.println("Error: " + e);
                     }
+                    iterator.remove();
+                    orderRequirements.remove(order);
+                    System.out.println("Order " + order.getOrderId() + " is completed and removed from the queue.");
                 }
             }
         }
@@ -177,10 +161,9 @@ public class OrderService {
             e.printStackTrace();
         }
 
-
         totalOrdersInQueue.decrementAndGet();
 
-        messagingTemplate.convertAndSend("/topic/order-complete", totalOrdersInQueue.get()+"-"+"Order " + order.getOrderId()+" Processed");
+        messagingTemplate.convertAndSend("/topic/order-complete", totalOrdersInQueue.get() + "-Order " + order.getOrderId() + " Processed");
 
         System.out.println("Updated queue: Orders in queue: " + totalOrdersInQueue.get() +
                 ", Items in queue: " + totalItemsInQueue.get());
@@ -193,5 +176,4 @@ public class OrderService {
     public int getTotalItemsInQueue() {
         return totalItemsInQueue.get();
     }
-
 }
