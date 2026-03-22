@@ -8,9 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Queue;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -26,10 +24,11 @@ public class OrderService {
     @Value("${helper.coeff}")
     private double helperCoeff;
     private final BlockingQueue<Order> orderQueue = new LinkedBlockingQueue<>();
-    private final HashMap<Order, Integer> orderRequirements = new HashMap<>(); // To track item requirements per order
+    private final ConcurrentHashMap<Order, Integer> orderRequirements = new ConcurrentHashMap<>(); // To track item requirements per order
     private final AtomicInteger totalOrdersInQueue = new AtomicInteger(0);
     private final AtomicInteger totalItemsInQueue = new AtomicInteger(0);
     private final AtomicInteger processedItems = new AtomicInteger(0);
+    private final Semaphore itemsAvailable = new Semaphore(0);
 
     @Autowired
     private CounterService counterService;
@@ -59,6 +58,8 @@ public class OrderService {
         System.out.println(totalOrdersInQueue + "-" + totalItemsInQueue);
         System.out.println("Order " + order.getOrderId() + " added to queue.");
 
+        itemsAvailable.release(order.getItemQty()); // signal that items are available
+
         messagingTemplate.convertAndSend("/topic/order-updates", totalOrdersInQueue + "-" + totalItemsInQueue);
 
         counterService.updateCounters(getTotalOrdersInQueue(), getTotalItemsInQueue());
@@ -68,35 +69,30 @@ public class OrderService {
         Executors.newSingleThreadExecutor().submit(() -> {
             while (true) {
                 try {
-                    // Wait until there are items to process
-                    if (totalItemsInQueue.get() > 0) {
-                        Future<Integer> futureCounter = counterService.acquireCounterAsync(); // Acquire a counter
-                        Integer counterId = futureCounter.get(); // Blocking call to get the counter ID
-                        if (counterId == null || counterId == -1) {
-                            Thread.sleep(100);
-                            continue;
-                        }
+                    itemsAvailable.acquire(); // blocks until an item is available, no busy-wait
 
-                        counterService.executorService.submit(() -> {
-                            try {
-                                processItems(counterId);  // Process item using the acquired counter
+                    Future<Integer> futureCounter = counterService.acquireCounterAsync();
+                    Integer counterId = futureCounter.get();
 
-                                // Release the counter after processing
-                                counterService.releaseCounterAsync(counterId).get();  // Ensure counter release
-                                System.out.println("Counter " + counterId + " has been released.");
-
-                            } catch (InterruptedException | ExecutionException e) {
-                                System.out.println("Error processing item: " + e.getMessage());
-                            }
-                        });
-                    } else {
-                        // No items to process, wait for a short time before checking again
-                        Thread.sleep(100);  // Sleep for a short duration (e.g., 100 ms)
+                    if (counterId == null || counterId == -1) {
+                        itemsAvailable.release(); // put the permit back
+                        continue;
                     }
+
+                    counterService.executorService.submit(() -> {
+                        try {
+                            processItems(counterId);
+                            counterService.releaseCounterAsync(counterId).get();
+                            System.out.println("Counter " + counterId + " has been released.");
+                        } catch (InterruptedException | ExecutionException e) {
+                            System.out.println("Error processing item: " + e.getMessage());
+                        }
+                    });
+
                 } catch (InterruptedException | ExecutionException e) {
-                    Thread.currentThread().interrupt();  // Restore interrupted status
+                    Thread.currentThread().interrupt();
                     System.out.println("Processing interrupted.");
-                    break;  // Exit the loop on interruption
+                    break;
                 }
             }
         });
