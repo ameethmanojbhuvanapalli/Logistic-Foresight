@@ -49,6 +49,3 @@ logs/
 *.zip
 *.tar.gz
 *.rar
-
-# Maven wrapper
-.mvn/wrapper/maven-wrapper.properties
