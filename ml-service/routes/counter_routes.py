@@ -16,7 +16,7 @@ counter_bp = Blueprint('counter', __name__)
 @counter_bp.route('/predict-counters', methods=['POST'])
 def predict_counters_route():
     """
-    POST /packing/predict-counters
+    POST /counter/predict-counters
     Body: {
         "OrderCount": int,
         "TotalItemQty": int,
@@ -49,7 +49,7 @@ def predict_counters_route():
 @counter_bp.route('/reload-model', methods=['POST'])
 def reload_model_route():
     """
-    POST /packing/reload-model
+    POST /counter/reload-model
     Force reload the counter model from disk.
     """
     try:

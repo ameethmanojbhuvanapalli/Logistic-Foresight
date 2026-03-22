@@ -16,7 +16,7 @@ routing_bp = Blueprint('routing', __name__)
 @routing_bp.route('/get-route', methods=['POST'])
 def get_route_route():
     """
-    POST /delivery/get-route
+    POST /route/get-route
     Body: {
         "OrderLocations": [
             { "Latitude": float, "Longitude": float, ...other fields preserved }

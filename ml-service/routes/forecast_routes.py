@@ -13,16 +13,16 @@ logger = logging.getLogger(__name__)
 forecast_bp = Blueprint('forecast', __name__)
 
 
-@forecast_bp.route('/predict-orders', methods=['POST'])
+@forecast_bp.route('/forecast-orders', methods=['POST'])
 def predict_orders_route():
     """
-    POST /packing/predict-orders
+    POST /forecast/forecast-orders
     Body: {
         "Weeks": int | null,   (optional — how many weeks of history to use)
         "Hours": int           (optional — how many hours to forecast, default 3)
     }
     Returns: {
-        predicted_orders, actual_orders, rmse,
+        forecasted_orders, actual_orders, rmse,
         order_qty, item_qty, predicted_counters
     }
     """

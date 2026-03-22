@@ -17,7 +17,7 @@ clustering_bp = Blueprint('clustering', __name__)
 @clustering_bp.route('/cluster-orders', methods=['POST'])
 def cluster_orders_route():
     """
-    POST /delivery/cluster-orders
+    POST /cluster/cluster-orders
     Body: {
         "Orders": [
             { "ORDERID": int, "ITEMQTY": int, "LATITUDE": float, "LONGITUDE": float }

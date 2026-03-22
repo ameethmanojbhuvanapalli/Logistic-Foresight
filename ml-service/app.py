@@ -9,6 +9,9 @@ from routes.forecast_routes  import forecast_bp
 from routes.clustering_routes import clustering_bp
 from routes.routing_routes   import routing_bp
 
+from dotenv import load_dotenv
+load_dotenv()
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -18,10 +21,10 @@ def create_app():
     app.secret_key = os.getenv('SECRET_KEY', 'dev-secret')
 
     # Register blueprints — app.py owns no business logic
-    app.register_blueprint(counter_bp,    url_prefix='/packing')
-    app.register_blueprint(forecast_bp,   url_prefix='/packing')
-    app.register_blueprint(clustering_bp, url_prefix='/delivery')
-    app.register_blueprint(routing_bp,    url_prefix='/delivery')
+    app.register_blueprint(counter_bp,    url_prefix='/counter')
+    app.register_blueprint(forecast_bp,   url_prefix='/forecast')
+    app.register_blueprint(clustering_bp, url_prefix='/cluster')
+    app.register_blueprint(routing_bp,    url_prefix='/route')
 
     @app.route('/health', methods=['GET'])
     def health():
