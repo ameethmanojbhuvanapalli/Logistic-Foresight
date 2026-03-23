@@ -3,6 +3,7 @@ package com.example.Packing.Service.Service;
 import com.example.Packing.Service.Entity.Order;
 import com.example.Packing.Service.Repository.OrderRepository;
 import com.fasterxml.jackson.core.JsonProcessingException;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -44,7 +45,8 @@ public class OrderService {
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
-    public OrderService() {
+    @PostConstruct
+    public void init() {
         processQueue();
     }
 
@@ -124,6 +126,8 @@ public class OrderService {
 
 
     private synchronized void processOrders() {
+        Order orderToComplete = null;
+
         for (Iterator<Order> iterator = orderQueue.iterator(); iterator.hasNext();) {
             Order order = iterator.next();
             int requiredItems = orderRequirements.get(order);
@@ -135,15 +139,19 @@ public class OrderService {
                 orderRequirements.put(order, requiredItems);
 
                 if (requiredItems == 0) {
-                    try {
-                        completeOrder(order);
-                    } catch (JsonProcessingException e) {
-                        System.out.println("Error: " + e);
-                    }
                     iterator.remove();
                     orderRequirements.remove(order);
-                    System.out.println("Order " + order.getOrderId() + " is completed and removed from the queue.");
+                    orderToComplete = order;
+                    break;
                 }
+            }
+        }
+
+        if (orderToComplete != null) {
+            try {
+                completeOrder(orderToComplete); // outside synchronized, no lock held during network call
+            } catch (JsonProcessingException e) {
+                System.out.println("Error: " + e);
             }
         }
     }
