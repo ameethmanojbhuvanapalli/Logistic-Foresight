@@ -21,15 +21,6 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
 public void registerStompEndpoints(StompEndpointRegistry registry) {
     registry.addEndpoint("/ws")
-            .setAllowedOriginPatterns("*")
-            .withSockJS()
-            .setWebSocketEnabled(true)
-            .setSessionCookieNeeded(false)
-            .setTransportHandlerOverrides(
-                new DefaultSockJsService.TransportHandlerOverride(
-                    TransportType.JSONP, null),  // disable JSONP
-                new DefaultSockJsService.TransportHandlerOverride(
-                    TransportType.JSONP_SEND, null)  // disable JSONP send
-            );
+            .setAllowedOriginPatterns("*");
     }
 }
