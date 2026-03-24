@@ -29,6 +29,7 @@ public class OrderService {
     private final AtomicInteger processedItems = new AtomicInteger(0);
     private final Semaphore itemsAvailable = new Semaphore(0);
     private final ExecutorService itemProcessorPool = Executors.newCachedThreadPool();
+    private final ExecutorService queueMonitor = Executors.newSingleThreadExecutor();
 
     @Autowired
     private CounterService counterService;
@@ -67,7 +68,7 @@ public class OrderService {
     }
 
     private void processQueue() {
-        Executors.newSingleThreadExecutor().submit(() -> {
+        queueMonitor.submit(() -> {
             while (true) {
                 try {
                     itemsAvailable.acquire();
@@ -86,8 +87,9 @@ public class OrderService {
                             counterService.releaseCounterAsync(counterId).get();
                             System.out.println("Counter " + counterId + " has been released.");
 
-                        } catch (InterruptedException | ExecutionException e) {
-                            System.out.println("Error processing item: " + e.getMessage());
+                        } catch (Exception e) {
+                            System.out.println("Error in item processor: " + e.getMessage());
+                            e.printStackTrace();
                         }
                     });
 
@@ -95,6 +97,10 @@ public class OrderService {
                     Thread.currentThread().interrupt();
                     System.out.println("Processing interrupted.");
                     break;
+                } catch (Exception e) {
+                    // keep monitor thread alive on any unexpected error
+                    System.out.println("Unexpected error in processQueue: " + e.getMessage());
+                    e.printStackTrace();
                 }
             }
         });
