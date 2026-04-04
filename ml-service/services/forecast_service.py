@@ -47,7 +47,7 @@ def predict_orders(weeks=None, hours=3):
     """
     db = get_db()
 
-    pipeline = [{'$addFields': {'orderDT': {'$toDate': '$orderDT'}}}]
+    pipeline = [{'$addFields': {'orderDT': {'$toDate': '$ORDERDT'}}}]  # ← CHANGED: $ORDERDT
 
     if weeks is not None:
         start_date = datetime.datetime.now() - datetime.timedelta(weeks=weeks)
@@ -62,7 +62,7 @@ def predict_orders(weeks=None, hours=3):
                     'day':   {'$dayOfMonth':  '$orderDT'},
                     'hour':  {'$hour':        '$orderDT'},
                 },
-                'totalQuantity': {'$sum': '$itemQty'},
+                'totalQuantity': {'$sum': '$ITEMQTY'},  # ← CHANGED: $ITEMQTY
                 'totalOrders':   {'$sum': 1},
             }
         },
