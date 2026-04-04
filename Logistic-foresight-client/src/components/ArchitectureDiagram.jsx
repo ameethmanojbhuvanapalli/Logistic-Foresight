@@ -387,10 +387,70 @@ function ArchitectureDiagram() {
               pointerEvents: "auto",
             }}
           >
-            <strong style={{ display: "block", marginBottom: 6, fontSize: 13, color: infoTypeStyle.header }}>
+            <strong
+              style={{
+                display: "block",
+                marginBottom: 6,
+                fontSize: 13,
+                color: infoTypeStyle.header,
+              }}
+            >
               {infoService.name}
             </strong>
-            {infoService.description}
+
+            <p style={{ margin: 0, marginBottom: 8 }}>
+              {infoService.description}
+            </p>
+
+            {infoService.accessUrl && (
+              <div
+                style={{
+                  marginTop: 10,
+                  paddingTop: 8,
+                  borderTop: "1px solid #e5e7eb",
+                }}
+              >
+                {/* ✅ THIS WAS YOUR BUG */}
+                <a
+                  href={infoService.accessUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: "inline-block",
+                    padding: "6px 12px",
+                    background: infoTypeStyle.header,
+                    color: "white",
+                    borderRadius: 4,
+                    textDecoration: "none",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    marginBottom: 6,
+                  }}
+                >
+                  Open Studio →
+                </a>
+
+                {infoService.credentials && (
+                  <div
+                    style={{
+                      marginTop: 8,
+                      padding: "6px 8px",
+                      background: "#f9fafb",
+                      borderRadius: 4,
+                      fontSize: 10,
+                      fontFamily: "monospace",
+                    }}
+                  >
+                    <div>
+                      <strong>Username:</strong> {infoService.credentials.username}
+                    </div>
+                    <div>
+                      <strong>Password:</strong> {infoService.credentials.password}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
       </div>

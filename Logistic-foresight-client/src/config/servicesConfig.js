@@ -106,7 +106,12 @@ const services = [
     name: "KSQL DB Studio",
     type: "tool",
     description:
-      "A KSQL DB Studio UI hosted on Render. Provides a developer-friendly interface for exploring and querying the KSQL DB server. Read-only credentials are available for demo access.",
+      "A KSQL DB Studio UI hosted on Render. Provides a developer-friendly interface for exploring and querying the KSQL DB server.",
+    accessUrl: import.meta.env.VITE_KSQLDB_STUDIO_URL || null,
+    credentials: {
+      username: "read",
+      password: "read123"
+    },
     warmupUrl: import.meta.env.VITE_KSQLDB_STUDIO_URL
       ? `${import.meta.env.VITE_KSQLDB_STUDIO_URL}`
       : null,
@@ -114,6 +119,6 @@ const services = [
     dependencies: ["ksqldb-server"],
     layout: { cx: 645, cy: 468 },
   },
-];
+  ];
 
 export default services;
