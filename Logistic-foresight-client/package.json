@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@headlessui/react": "^2.1.10",
+    "avro": "^0.1.0",
     "avsc": "^5.7.9",
     "axios": "^1.7.7",
     "framer-motion": "^11.5.6",

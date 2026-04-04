@@ -1,5 +1,5 @@
 import { Kafka } from 'kafkajs';
-import avro from 'apache-avsc';
+import avro from 'avro';
 
 let _producer = null;
 
@@ -47,7 +47,7 @@ export async function publishOrders(orders, topic) {
     // Confluent format: [magic byte (1)] + [schema ID (4)] + [avro data]
     const buffer = Buffer.alloc(5 + avroData.length);
     buffer[0] = 0; // Magic byte
-    buffer.writeInt32BE(1, 1); // Schema ID (adjust if needed)
+    buffer.writeInt32BE(1, 1); // Schema ID
     avroData.copy(buffer, 5);
     
     return {
