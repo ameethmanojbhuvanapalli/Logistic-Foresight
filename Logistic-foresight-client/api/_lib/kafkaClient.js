@@ -88,8 +88,15 @@ export async function publishOrders(orders, topic) {
   
   const messages = orders.map((o) => {
     try {
+      const normalized = {
+        ...o,
+        ORDERDT: o.ORDERDT instanceof Date
+          ? o.ORDERDT.toISOString()
+          : o.ORDERDT
+      };
+
       // Encode to Avro
-      const avroData = avroType.toBuffer(o);
+      const avroData = avroType.toBuffer(normalized);
       
       // Confluent format: [magic byte] + [schema ID] + [avro data]
       const buffer = Buffer.alloc(5 + avroData.length);
@@ -98,7 +105,7 @@ export async function publishOrders(orders, topic) {
       avroData.copy(buffer, 5);
       
       return {
-        key: String(o.ORDERID),
+        key: String(normalized.ORDERID),
         value: buffer,
       };
     } catch (err) {
