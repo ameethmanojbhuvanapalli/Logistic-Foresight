@@ -1,25 +1,39 @@
 import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let BANGALORE_AREAS = [];
+let areasLoaded = false;
 
-export async function loadAreasFromCSV(filePath = 'bangalore_areas.csv') {
-  const content = fs.readFileSync(filePath, 'utf-8');
-  const lines = content.trim().split('\n');
+function loadAreasFromCSV() {
+  if (areasLoaded) return; // Only load once
   
-  // Skip header row
-  BANGALORE_AREAS = lines.slice(1).map((line, index) => {
-    const [area, pincode, latitude, longitude] = line.split(',').map(s => s.trim());
-    return {
-      areaId: index + 1,
-      name: area,
-      pincode: pincode,
-      lat: parseFloat(latitude),
-      lng: parseFloat(longitude),
-    };
-  });
+  const csvPath = path.join(__dirname, '..', 'data', 'bangalore_areas.csv');
   
-  console.log(`Loaded ${BANGALORE_AREAS.length} areas from CSV`);
-  return BANGALORE_AREAS;
+  try {
+    const content = fs.readFileSync(csvPath, 'utf-8');
+    const lines = content.trim().split('\n');
+    
+    // Skip header row
+    BANGALORE_AREAS = lines.slice(1).map((line, index) => {
+      const [area, pincode, latitude, longitude] = line.split(',').map(s => s.trim());
+      return {
+        areaId: index + 1,
+        name: area,
+        pincode: pincode,
+        lat: parseFloat(latitude),
+        lng: parseFloat(longitude),
+      };
+    });
+    
+    areasLoaded = true;
+    console.log(`Loaded ${BANGALORE_AREAS.length} areas from CSV`);
+  } catch (error) {
+    console.error('Error loading CSV:', error);
+    throw new Error(`Failed to load CSV: ${error.message}`);
+  }
 }
 
 function randomInt(min, max) {
@@ -27,8 +41,13 @@ function randomInt(min, max) {
 }
 
 export function generateOrders(count) {
+  // Auto-load areas on first call
+  if (!areasLoaded) {
+    loadAreasFromCSV();
+  }
+  
   if (BANGALORE_AREAS.length === 0) {
-    throw new Error('Areas not loaded. Call loadAreasFromCSV() first.');
+    throw new Error('Areas not loaded. Check CSV file path.');
   }
   
   const now = Date.now();
