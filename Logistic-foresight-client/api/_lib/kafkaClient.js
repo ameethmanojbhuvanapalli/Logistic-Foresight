@@ -1,9 +1,9 @@
 import { Kafka } from 'kafkajs';
-import avro from 'avro';
+import avsc from 'avsc';
 
 let _producer = null;
 
-// Avro schema matching your Order structure
+// Avro schema
 const orderSchema = {
   type: 'record',
   name: 'Order',
@@ -17,7 +17,12 @@ const orderSchema = {
   ],
 };
 
-const avroType = avro.Type.forSchema(orderSchema);
+let avroType;
+try {
+  avroType = avsc.Type.forSchema(orderSchema);
+} catch (err) {
+  console.error('Failed to create Avro schema:', err);
+}
 
 async function getProducer() {
   if (!_producer) {
@@ -41,19 +46,24 @@ export async function publishOrders(orders, topic) {
   const producer = await getProducer();
   
   const messages = orders.map((o) => {
-    // Encode to Avro
-    const avroData = avroType.toBuffer(o);
-    
-    // Confluent format: [magic byte (1)] + [schema ID (4)] + [avro data]
-    const buffer = Buffer.alloc(5 + avroData.length);
-    buffer[0] = 0; // Magic byte
-    buffer.writeInt32BE(1, 1); // Schema ID
-    avroData.copy(buffer, 5);
-    
-    return {
-      key: String(o.OrderId),
-      value: buffer,
-    };
+    try {
+      // Encode to Avro
+      const avroData = avroType.toBuffer(o);
+      
+      // Confluent format: [magic byte] + [schema ID] + [avro data]
+      const buffer = Buffer.alloc(5 + avroData.length);
+      buffer[0] = 0; // Magic byte
+      buffer.writeInt32BE(1, 1); // Schema ID (check your registry)
+      avroData.copy(buffer, 5);
+      
+      return {
+        key: String(o.OrderId),
+        value: buffer,
+      };
+    } catch (err) {
+      console.error('Error encoding Avro:', err);
+      throw err;
+    }
   });
 
   await producer.send({
