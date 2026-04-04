@@ -36,17 +36,25 @@ def get_db():
 def predict_orders(weeks=None, hours=3):
     """
     Fetch order history from MongoDB, train Prophet, and forecast.
+
+    Args:
+        weeks:  int | None — how many past weeks of data to use (None = all)
+        hours:  int — how many hours ahead to forecast
+
+    Returns:
+        dict with keys: predicted_orders, actual_orders, rmse,
+                        order_qty, item_qty, predicted_counters
     """
     db = get_db()
 
-    # Parse ORDERDT string to proper date and group
+    # Parse ORDERDT string to date (without milliseconds to avoid format errors)
     pipeline = [
         {
             '$addFields': {
                 'orderDT': {
                     '$dateFromString': {
-                        'dateString': '$ORDERDT',
-                        'format': '%Y-%m-%dT%H:%M:%S.%fZ'  # ISO format
+                        'dateString': {'$substr': ['$ORDERDT', 0, 19]},  # "2026-04-04T13:03:06"
+                        'format': '%Y-%m-%dT%H:%M:%S'
                     }
                 }
             }
@@ -66,7 +74,7 @@ def predict_orders(weeks=None, hours=3):
                     'day':   {'$dayOfMonth':  '$orderDT'},
                     'hour':  {'$hour':        '$orderDT'},
                 },
-                'totalQuantity': {'$sum': '$ITEMQTY'},
+                'totalQuantity': {'$sum': '$ITEMQTY'},  # Changed: itemQty → ITEMQTY
                 'totalOrders':   {'$sum': 1},
             }
         },
@@ -75,28 +83,14 @@ def predict_orders(weeks=None, hours=3):
 
     try:
         data = list(db.Orders.aggregate(pipeline))
-        logger.info(f"Aggregation returned {len(data)} records")
-        
         if not data:
             raise ValueError('No data available for the given time range')
 
-        logger.info(f"Sample data: {data[:2]}")
-        
         df = pd.DataFrame(data)
-        
-        # Safely construct datetime string
-        df['ds'] = df['_id'].apply(
-            lambda x: pd.Timestamp(
-                year=int(x['year']), 
-                month=int(x['month']), 
-                day=int(x['day']), 
-                hour=int(x['hour'])
-            )
-        )
+        df['ds'] = pd.to_datetime(df['_id'].apply(
+            lambda x: f"{x['year']}-{x['month']:02d}-{x['day']:02d} {x['hour']:02d}:00:00"
+        ))
         df['y'] = df['totalQuantity']
-
-        logger.info(f"DataFrame shape: {df.shape}")
-        logger.info(f"DataFrame dtypes: {df.dtypes}")
 
         model = Prophet(weekly_seasonality=True, daily_seasonality=True, yearly_seasonality=True)
         model.fit(df[['ds', 'y']])

@@ -1,39 +1,39 @@
 package com.example.Packing.Service.Entity;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 @Document(collection = "Orders")
 public class Order {
 
     @Id
-    private String id;  // This will be generated automatically by MongoDB
+    private String id;
 
-    @JsonProperty("ORDERID")
-    private Long orderId;  // This is your custom orderId field
+    @Field("ORDERID")
+    private Long orderId;
 
-    @JsonProperty("ITEMQTY")
+    @Field("ITEMQTY")
     private Integer itemQty;
 
-    @JsonProperty("LATITUDE")
+    @Field("LATITUDE")
     private Double latitude;
 
-    @JsonProperty("LONGITUDE")
+    @Field("LONGITUDE")
     private Double longitude;
 
-    @JsonProperty("ORDERDT")
+    @Field("ORDERDT")
     private String orderDT;
 
-    @JsonProperty("ORDERSTATUS")
+    @Field("ORDERSTATUS")
     private Integer orderStatus;
 
     // Getters and Setters
-    public String getId() {  // Getter for MongoDB's generated _id field
+    public String getId() {
         return id;
     }
 
-    public void setId(String id) {  // Setter for MongoDB's generated _id field (optional)
+    public void setId(String id) {
         this.id = id;
     }
 
