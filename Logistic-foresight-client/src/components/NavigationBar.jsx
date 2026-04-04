@@ -5,7 +5,7 @@ import LogoWide from "../assets/LogoWide.png";
 import RightArrow from "../assets/icons/rightArrow.svg";
 import { motion } from "framer-motion";
 
-import { BarChart2, HelpCircle } from "lucide-react";
+import { Home, BarChart2, HelpCircle } from "lucide-react";
 
 const variants = {
   expanded: { width: "20%" },
@@ -35,12 +35,26 @@ function NavigationBar() {
       </div>
 
       <div className="mt-10 flex flex-col space-y-8 ">
-        {/* Dashboard Link */}
+        {/* Home Link */}
         <Link to="/">
           <div
             className={
               "flex space-x-3 w-full p-2 rounded " +
               (location.pathname === "/"
+                ? " bg-[#FF8C8C] text-white font-semibold"
+                : " text-black")
+            }>
+            <Home />
+            <span className={isExpanded ? "block" : "hidden"}>Home</span>
+          </div>
+        </Link>
+
+        {/* Dashboard Link */}
+        <Link to="/dashboard">
+          <div
+            className={
+              "flex space-x-3 w-full p-2 rounded " +
+              (location.pathname === "/dashboard"
                 ? " bg-[#FF8C8C] text-white font-semibold"
                 : " text-black")
             }>
@@ -59,7 +73,7 @@ function NavigationBar() {
                 : " text-black")
             }>
             <HelpCircle />
-            <span className={isExpanded ? "block" : "hidden"}>About us</span>
+            <span className={isExpanded ? "block" : "hidden"}>About</span>
           </div>
         </Link>
       </div>
