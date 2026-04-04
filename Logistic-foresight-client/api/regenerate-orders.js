@@ -7,7 +7,7 @@ export default async function handler(req, res) {
   if (!process.env.MONGO_URI) return res.status(500).json({ error: 'Missing MONGO_URI' });
 
   let count = req.body?.count;
-  count = (!count || count === '') ? 20 : Math.min(Math.max(parseInt(count, 10), 1), 100);
+  count = (!count || count === '') ? 150000 : Math.min(Math.max(parseInt(count, 10), 1), 150000);
 
   try {
     const collection = await getOrdersCollection();
