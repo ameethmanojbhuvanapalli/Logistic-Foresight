@@ -32,7 +32,7 @@ const services = [
     name: "React Dashboard",
     type: "frontend",
     description:
-      "The Vite + React dashboard you are looking at right now. Visualises real-time counter predictions, order forecasts, and delivery routes. Always live — no warmup required.",
+      "The Vite + React dashboard you are looking at right now. Visualizes real-time counter predictions, order forecasts, and delivery routes. Always live — no warmup required.",
     warmupUrl: null,
     healthUrl: null,
     dependencies: [],
@@ -70,7 +70,7 @@ const services = [
     name: "ML Service",
     type: "ml",
     description:
-      "A Flask server hosted on Render. Hosts four machine-learning models that power counter predictions, order forecasting, delivery clustering, and route optimisation.",
+      "A Flask server hosted on Render. Hosts four machine-learning models that power counter predictions, order forecasting, delivery clustering, and route optimization.",
     warmupUrl: import.meta.env.VITE_ML_SERVICE_URL
       ? `${import.meta.env.VITE_ML_SERVICE_URL}/health`
       : null,

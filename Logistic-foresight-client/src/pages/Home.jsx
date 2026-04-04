@@ -111,7 +111,7 @@ function Home() {
               Free-tier cold-start notice
             </p>
             <p className="text-sm text-yellow-600 mt-1">
-              All backend services are hosted on Render&apos;s free tier and may be
+              All backend services are hosted on Render's free tier and may be
               sleeping. They can take <strong>30–90 seconds</strong> to wake up
               after the first request. Use the interactive architecture below to
               warm them up before using the Dashboard.

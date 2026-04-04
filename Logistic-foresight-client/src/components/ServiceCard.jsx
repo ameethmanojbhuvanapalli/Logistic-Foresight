@@ -79,6 +79,9 @@ function ServiceCard({ service }) {
 
   const attemptPing = useCallback(
     (url) => {
+      // mode: "no-cors" is intentional: we only need to wake the service, not
+      // read its response. A successful fetch (opaque response) means the server
+      // responded; a TypeError/network error means it is still sleeping.
       fetch(url, { mode: "no-cors", cache: "no-cache" })
         .then(() => {
           setStatus("live");
