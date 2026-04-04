@@ -18,7 +18,7 @@ import HODPhoto from "../assets/people/HOD-CSE.jpg";
 import ReactLogo from '../assets/logos/react-logo.svg';
 import FlaskLogo from '../assets/logos/Flask-logo.svg';
 import SpringBootLogo from '../assets/logos/spring-boot-logo.png';
-import KafkaLogo from '../assets/logos/Apache-kafka-logo.svg';
+import KafkaLogo from '../assets/logos/Apache-Kafka-logo.svg';
 import MongoDBLogo from '../assets/logos/MongoDB_logo.svg';
 import SQLServerLogo from '../assets/logos/Microsoft-SQL-Server-logo.svg';
 import DockerLogo from '../assets/logos/Docker-logo.svg';
