@@ -1,5 +1,6 @@
 import NavigationBar from "../components/NavigationBar";
 import ArchitectureDiagram from "../components/ArchitectureDiagram";
+import ArchitecturePhoto from "../assets/images/architecture.png";
 import { Link } from "react-router-dom";
 import {
   TrendingUpDown,
@@ -100,6 +101,24 @@ function Home() {
                 <Icon className="h-10 w-10 text-[#ff8c8c]" />
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* ── Architecture Diagram (Static Image) ── */}
+        <section>
+          <h2 className="text-2xl font-semibold text-[#ff8c8c] mb-1">
+            Architecture Diagram
+          </h2>
+          <p className="text-gray-500 text-sm mb-4">
+            High-level flow of the Logistic Foresight platform.
+          </p>
+
+          <div className="bg-white border rounded-xl p-4 shadow-sm">
+            <img
+              src={ArchitecturePhoto}
+              alt="Logistic Foresight architecture diagram"
+              className="w-full h-auto rounded-lg object-contain"
+            />
           </div>
         </section>
 
