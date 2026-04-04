@@ -287,105 +287,113 @@ function ArchitectureDiagram() {
   }, []);
 
   const infoService = openInfo ? services.find((s) => s.id === openInfo) : null;
-  const infoPos     = infoService?.layout;
+  const infoPos = infoService?.layout;
 
-  // Position the info panel to the right of the node, clamped inside canvas
-  const infoPanelX = infoPos ? Math.min(infoPos.cx + NW / 2 + 10, W - 218) : 0;
+  // Position the info panel to the right of the node; flip left if near right edge.
+  const PANEL_W = 230;
+  const PANEL_OFFSET = NW / 2 + 12;
+  const rawX = infoPos ? infoPos.cx + PANEL_OFFSET : 0;
+  const infoPanelX = infoPos
+    ? rawX + PANEL_W > W - 8 ? infoPos.cx - PANEL_OFFSET - PANEL_W : rawX
+    : 0;
   const infoPanelY = infoPos ? Math.max(infoPos.cy - NH / 2, 8) : 0;
+
+  const infoTypeStyle = infoService ? (TYPE_STYLE[infoService.type] || TYPE_STYLE.backend) : null;
 
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 bg-gray-50 p-2 shadow-sm">
-      <svg
-        width={W}
-        height={H}
-        viewBox={`0 0 ${W} ${H}`}
-        style={{ display: "block", margin: "0 auto", maxWidth: "100%" }}
+      {/* position:relative wrapper so the HTML tooltip overlay aligns with SVG coords */}
+      <div
+        style={{ position: "relative", width: W, margin: "0 auto" }}
         onClick={() => setOpenInfo(null)}
       >
-        <defs>
-          {/* Arrowhead marker */}
-          <marker id="ah" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
-            <path d="M 0 0 L 9 3.5 L 0 7 Z" fill="#94a3b8" />
-          </marker>
-        </defs>
+        <svg
+          width={W}
+          height={H}
+          viewBox={`0 0 ${W} ${H}`}
+          style={{ display: "block" }}
+        >
+          <defs>
+            {/* Arrowhead marker */}
+            <marker id="ah" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+              <path d="M 0 0 L 9 3.5 L 0 7 Z" fill="#94a3b8" />
+            </marker>
+          </defs>
 
-        {/* ── Swim-lane backgrounds ── */}
-        {LANES.map((lane) => (
-          <g key={lane.label}>
-            <rect
-              x={8} y={lane.y1} width={W - 16} height={lane.y2 - lane.y1}
-              rx={8} fill={lane.fill} stroke={lane.stroke} strokeWidth={1}
+          {/* ── Swim-lane backgrounds ── */}
+          {LANES.map((lane) => (
+            <g key={lane.label}>
+              <rect
+                x={8} y={lane.y1} width={W - 16} height={lane.y2 - lane.y1}
+                rx={8} fill={lane.fill} stroke={lane.stroke} strokeWidth={1}
+              />
+              {/* Lane label */}
+              <text
+                x={22} y={lane.y1 + 15}
+                fontSize={9} fill="#94a3b8"
+                fontFamily="Poppins, sans-serif" fontWeight="700"
+                letterSpacing="0.08em"
+              >
+                {lane.label.toUpperCase()}
+              </text>
+            </g>
+          ))}
+
+          {/* ── Arrows ── */}
+          {edges.map(({ from, to, key }) => (
+            <path
+              key={key}
+              d={elbowPath(from, to)}
+              stroke="#94a3b8"
+              strokeWidth={1.5}
+              fill="none"
+              strokeLinejoin="round"
+              markerEnd="url(#ah)"
             />
-            {/* Lane label */}
-            <text
-              x={22} y={lane.y1 + 15}
-              fontSize={9} fill="#94a3b8"
-              fontFamily="Poppins, sans-serif" fontWeight="700"
-              letterSpacing="0.08em"
-            >
-              {lane.label.toUpperCase()}
-            </text>
-          </g>
-        ))}
+          ))}
 
-        {/* ── Arrows ── */}
-        {edges.map(({ from, to, key }) => (
-          <path
-            key={key}
-            d={elbowPath(from, to)}
-            stroke="#94a3b8"
-            strokeWidth={1.5}
-            fill="none"
-            strokeLinejoin="round"
-            markerEnd="url(#ah)"
-          />
-        ))}
+          {/* ── Service nodes ── */}
+          {services.map((svc) => (
+            <SvgNode
+              key={svc.id}
+              service={svc}
+              status={nodeStates[svc.id]}
+              onWarmup={handleWarmup}
+              isInfoOpen={openInfo === svc.id}
+              onToggleInfo={handleToggleInfo}
+            />
+          ))}
+        </svg>
 
-        {/* ── Service nodes ── */}
-        {services.map((svc) => (
-          <SvgNode
-            key={svc.id}
-            service={svc}
-            status={nodeStates[svc.id]}
-            onWarmup={handleWarmup}
-            isInfoOpen={openInfo === svc.id}
-            onToggleInfo={handleToggleInfo}
-          />
-        ))}
-
-        {/* ── Description panel (foreignObject) ── */}
-        {infoService && infoPos && (
-          <foreignObject
-            x={infoPanelX}
-            y={infoPanelY}
-            width={210}
-            height={140}
-            style={{ overflow: "visible" }}
+        {/* ── Description panel — HTML overlay, never clipped by SVG viewport ── */}
+        {infoService && infoPos && infoTypeStyle && (
+          <div
             onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "absolute",
+              left: infoPanelX,
+              top: infoPanelY,
+              width: PANEL_W,
+              background: "white",
+              border: `1.5px solid ${infoTypeStyle.header}`,
+              borderTop: `4px solid ${infoTypeStyle.header}`,
+              borderRadius: 8,
+              padding: "10px 13px 12px",
+              fontSize: 12,
+              color: "#374151",
+              lineHeight: 1.6,
+              boxShadow: "0 8px 24px rgba(0,0,0,0.15)",
+              zIndex: 20,
+              pointerEvents: "auto",
+            }}
           >
-            <div
-              xmlns="http://www.w3.org/1999/xhtml"
-              style={{
-                background: "white",
-                border: "1.5px solid #e2e8f0",
-                borderRadius: 8,
-                padding: "9px 11px",
-                fontSize: 11,
-                color: "#374151",
-                lineHeight: 1.55,
-                boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
-                width: 210,
-                boxSizing: "border-box",
-              }}
-            >
-              <strong style={{ display: "block", marginBottom: 5, fontSize: 12, color: "#111827" }}>
-                {infoService.name}
-              </strong>
-              {infoService.description}
-            </div>
-          </foreignObject>
+            <strong style={{ display: "block", marginBottom: 6, fontSize: 13, color: infoTypeStyle.header }}>
+              {infoService.name}
+            </strong>
+            {infoService.description}
+          </div>
         )}
-      </svg>
+      </div>
 
       {/* ── Legend ── */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 pt-2 pb-1 border-t border-gray-100">
