@@ -3,17 +3,16 @@ import avsc from 'avsc';
 
 let _producer = null;
 
-// Avro schema
 const orderSchema = {
   type: 'record',
   name: 'Order',
   fields: [
-    { name: 'OrderId', type: 'long' },
-    { name: 'ItemQty', type: 'int' },
-    { name: 'Latitude', type: 'double' },
-    { name: 'Longitude', type: 'double' },
-    { name: 'OrderDT', type: 'string' },
-    { name: 'OrderStatus', type: 'int' },
+    { name: 'ORDERID', type: 'long' },
+    { name: 'ITEMQTY', type: 'int' },
+    { name: 'LATITUDE', type: 'double' },
+    { name: 'LONGITUDE', type: 'double' },
+    { name: 'ORDERDT', type: 'string' },
+    { name: 'ORDERSTATUS', type: 'int' },
   ],
 };
 

@@ -54,12 +54,12 @@ export function generateOrders(count) {
   return Array.from({ length: count }, (_, i) => {
     const area = BANGALORE_AREAS[randomInt(0, BANGALORE_AREAS.length - 1)];
     return {
-      OrderId: now + i,
-      ItemQty: randomInt(1, 11),
-      Latitude: area.lat,
-      Longitude: area.lng,
-      OrderDT: new Date().toISOString(),
-      OrderStatus: 1,
+      ORDERID: now + i,        // Changed from OrderId
+      ITEMQTY: randomInt(1, 11), // Changed from ItemQty
+      LATITUDE: area.lat,       // Changed from Latitude
+      LONGITUDE: area.lng,      // Changed from Longitude
+      ORDERDT: new Date().toISOString(), // Changed from OrderDT
+      ORDERSTATUS: 1,           // Changed from OrderStatus
     };
   });
 }

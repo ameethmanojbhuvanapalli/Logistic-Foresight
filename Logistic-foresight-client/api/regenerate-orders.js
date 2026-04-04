@@ -14,9 +14,12 @@ export default async function handler(req, res) {
     const deleteResult = await collection.deleteMany({});
     const orders = generateOrders(count);
     const docs = orders.map(o => ({
-      orderId: o.OrderId, itemQty: o.ItemQty,
-      latitude: o.Latitude, longitude: o.Longitude,
-      orderDT: o.OrderDT, orderStatus: o.OrderStatus,
+      ORDERID: o.ORDERID,           // Changed
+      ITEMQTY: o.ITEMQTY,           // Changed
+      LATITUDE: o.LATITUDE,         // Changed
+      LONGITUDE: o.LONGITUDE,       // Changed
+      ORDERDT: o.ORDERDT,           // Changed
+      ORDERSTATUS: o.ORDERSTATUS,   // Changed
       createdAt: new Date(),
     }));
     const insertResult = await collection.insertMany(docs);
