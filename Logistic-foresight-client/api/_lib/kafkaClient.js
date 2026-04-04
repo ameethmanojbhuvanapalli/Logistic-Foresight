@@ -47,8 +47,8 @@ async function getSchemaId() {
   if (_schemaId) return _schemaId; // Return cached value
   
   const registryUrl = process.env.SCHEMA_REGISTRY_URL;
-  const registryUser = process.env.SCHEMA_REGISTRY_USER;
-  const registryPassword = process.env.SCHEMA_REGISTRY_PASSWORD;
+  const registryUser = process.env.SCHEMA_REGISTRY_API_KEY;
+  const registryPassword = process.env.SCHEMA_REGISTRY_API_SECRET;
   
   if (!registryUrl || !registryUser || !registryPassword) {
     throw new Error('Missing Schema Registry credentials in env vars');
