@@ -1,5 +1,5 @@
 import { Kafka } from 'kafkajs';
-import avro from 'avsc';
+import avro from 'apache-avsc';
 
 let _producer = null;
 
@@ -17,7 +17,7 @@ const orderSchema = {
   ],
 };
 
-const encoder = avro.createEncoder(orderSchema);
+const avroType = avro.Type.forSchema(orderSchema);
 
 async function getProducer() {
   if (!_producer) {
@@ -42,12 +42,12 @@ export async function publishOrders(orders, topic) {
   
   const messages = orders.map((o) => {
     // Encode to Avro
-    const avroData = encoder.encode(o);
+    const avroData = avroType.toBuffer(o);
     
     // Confluent format: [magic byte (1)] + [schema ID (4)] + [avro data]
     const buffer = Buffer.alloc(5 + avroData.length);
     buffer[0] = 0; // Magic byte
-    buffer.writeInt32BE(1, 1); // Schema ID (change if your registry uses a different ID)
+    buffer.writeInt32BE(1, 1); // Schema ID (adjust if needed)
     avroData.copy(buffer, 5);
     
     return {
