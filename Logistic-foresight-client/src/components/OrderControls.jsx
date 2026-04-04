@@ -56,8 +56,8 @@ export default function OrderControls({ onOrdersGenerated, onRegenerated }) {
               className="border-2 border-[#ff8c8c] rounded-sm outline-none p-1 w-24"
               type="number"
               min="1"
-              max="10"
-              placeholder="1–10"
+              max="3"
+              placeholder="1–3"
               value={generateCount}
               onChange={(e) => setGenerateCount(e.target.value)}
               disabled={generateStatus === 'loading'}
@@ -89,9 +89,8 @@ export default function OrderControls({ onOrdersGenerated, onRegenerated }) {
             <input
               className="border-2 border-[#ff8c8c] rounded-sm outline-none p-1 w-24"
               type="number"
-              min="1"
-              max="100"
-              placeholder="default 20"
+              min="150000"
+              placeholder="min 150000"
               value={regenerateCount}
               onChange={(e) => setRegenerateCount(e.target.value)}
               disabled={regenerateStatus === 'loading'}
