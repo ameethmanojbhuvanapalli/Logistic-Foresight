@@ -1,334 +1,406 @@
 import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { Info } from "lucide-react";
 import services, {
   POLL_INTERVAL,
   WARMUP_TIMEOUT,
   KEEPALIVE_INTERVAL,
 } from "../config/servicesConfig";
 
-// ── Canvas dimensions ─────────────────────────────────────────────────────────
-// Adjust W/H here (or in servicesConfig.js layout.cx/cy) to resize the diagram.
-const W = 800;
-const H = 490;
-const NW = 160; // node width
-const NH = 72;  // node height
+// ─────────────────────────────────────────────────────────────────────────────
+// Canvas & node dimensions
+// ─────────────────────────────────────────────────────────────────────────────
+const W  = 860;   // SVG canvas width  (px)
+const H  = 520;   // SVG canvas height (px)
+const NW = 158;   // node box width
+const NH = 76;    // node box height
+const HR = 26;    // colored header strip height inside each node
+const CR = 8;     // corner radius
 
-// ── Swim-lane bands (background shading) ─────────────────────────────────────
-// Edit label, y1, y2 and color to add / move lanes.
+// ─────────────────────────────────────────────────────────────────────────────
+// Swim-lane configuration
+// Edit label, y1/y2, fill and stroke to add / reposition lanes.
+// ─────────────────────────────────────────────────────────────────────────────
 const LANES = [
-  { label: "User Interface",    y1: 10,  y2: 120, color: "#f0f9ff" },
-  { label: "Business Services", y1: 128, y2: 248, color: "#faf5ff" },
-  { label: "ML & Data Layer",   y1: 256, y2: H-5, color: "#fff7ed" },
+  { label: "User Interface",    y1: 8,   y2: 122, fill: "#f0f9ff", stroke: "#93c5fd" },
+  { label: "Application Layer", y1: 130, y2: 262, fill: "#f5f3ff", stroke: "#c4b5fd" },
+  { label: "Data & ML Layer",   y1: 270, y2: H-6, fill: "#fff7ed", stroke: "#fdba74" },
 ];
 
-// ── Visual style maps ─────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Visual style per service type
+// ─────────────────────────────────────────────────────────────────────────────
 const TYPE_STYLE = {
-  frontend: { fill: "#eff6ff", stroke: "#93c5fd", textColor: "#1e3a8a" },
-  backend:  { fill: "#eef2ff", stroke: "#a5b4fc", textColor: "#312e81" },
-  ml:       { fill: "#faf5ff", stroke: "#d8b4fe", textColor: "#6b21a8" },
-  db:       { fill: "#fff7ed", stroke: "#fdba74", textColor: "#9a3412" },
-  tool:     { fill: "#f0fdfa", stroke: "#5eead4", textColor: "#134e4a" },
+  frontend: { header: "#2563eb", headerTxt: "#fff", body: "#eff6ff", bodyTxt: "#1e3a8a", label: "Frontend"  },
+  backend:  { header: "#6366f1", headerTxt: "#fff", body: "#eef2ff", bodyTxt: "#312e81", label: "Backend"   },
+  ml:       { header: "#9333ea", headerTxt: "#fff", body: "#faf5ff", bodyTxt: "#581c87", label: "ML / AI"   },
+  db:       { header: "#ea580c", headerTxt: "#fff", body: "#fff7ed", bodyTxt: "#9a3412", label: "Database"  },
+  tool:     { header: "#0d9488", headerTxt: "#fff", body: "#f0fdfa", bodyTxt: "#134e4a", label: "Tool"      },
 };
 
-const TYPE_LABELS = {
-  frontend: "Frontend",
-  backend:  "Backend",
-  ml:       "ML / AI",
-  db:       "Database",
-  tool:     "Tool",
+// ─────────────────────────────────────────────────────────────────────────────
+// Status dot color & label
+// ─────────────────────────────────────────────────────────────────────────────
+const STATUS_DOT = {
+  idle:         "#94a3b8",
+  warming:      "#eab308",
+  live:         "#22c55e",
+  failed:       "#ef4444",
+  unconfigured: "#cbd5e1",
 };
 
-const STATUS_STYLE = {
-  idle:         { dot: "#d1d5db", text: "#6b7280", label: "Idle" },
-  warming:      { dot: "#facc15", text: "#a16207", label: "Warming…" },
-  live:         { dot: "#22c55e", text: "#15803d", label: "Live" },
-  failed:       { dot: "#ef4444", text: "#b91c1c", label: "Failed" },
-  unconfigured: { dot: "#d1d5db", text: "#9ca3af", label: "Not configured" },
+const STATUS_LABEL = {
+  idle:         "Idle",
+  warming:      "Warming…",
+  live:         "Live",
+  failed:       "Failed",
+  unconfigured: "—",
 };
 
-// ── Arrow path helper ─────────────────────────────────────────────────────────
-// Returns an SVG path string for a smooth bezier connector between two nodes.
-// Exit/entry edges are chosen based on the dominant direction of travel.
-function arrowPath(from, to) {
+// ─────────────────────────────────────────────────────────────────────────────
+// Arrow path helper — orthogonal "elbow" connector between two node centres.
+// Exits the bottom of the source, enters the top of the target (vertical-
+// dominant), or exits a side for horizontal-dominant connections.
+// ─────────────────────────────────────────────────────────────────────────────
+function elbowPath(from, to) {
   const hw = NW / 2;
   const hh = NH / 2;
   const dx = to.cx - from.cx;
   const dy = to.cy - from.cy;
-  let sx, sy, tx, ty;
 
   if (Math.abs(dy) >= Math.abs(dx)) {
-    // Predominantly vertical
+    // Vertical-dominant
     if (dy > 0) {
-      sx = from.cx; sy = from.cy + hh; // exit bottom
-      tx = to.cx;   ty = to.cy - hh;   // enter top
+      const sx = from.cx, sy = from.cy + hh;
+      const tx = to.cx,   ty = to.cy   - hh;
+      const my = (sy + ty) / 2;
+      return `M ${sx} ${sy} L ${sx} ${my} L ${tx} ${my} L ${tx} ${ty}`;
     } else {
-      sx = from.cx; sy = from.cy - hh; // exit top
-      tx = to.cx;   ty = to.cy + hh;   // enter bottom
+      const sx = from.cx, sy = from.cy - hh;
+      const tx = to.cx,   ty = to.cy   + hh;
+      const my = (sy + ty) / 2;
+      return `M ${sx} ${sy} L ${sx} ${my} L ${tx} ${my} L ${tx} ${ty}`;
     }
-    const my = (sy + ty) / 2;
-    return `M ${sx} ${sy} C ${sx} ${my}, ${tx} ${my}, ${tx} ${ty}`;
   } else {
-    // Predominantly horizontal
+    // Horizontal-dominant
     if (dx > 0) {
-      sx = from.cx + hw; sy = from.cy; // exit right
-      tx = to.cx - hw;   ty = to.cy;   // enter left
+      const sx = from.cx + hw, sy = from.cy;
+      const tx = to.cx   - hw, ty = to.cy;
+      const mx = (sx + tx) / 2;
+      return `M ${sx} ${sy} L ${mx} ${sy} L ${mx} ${ty} L ${tx} ${ty}`;
     } else {
-      sx = from.cx - hw; sy = from.cy; // exit left
-      tx = to.cx + hw;   ty = to.cy;   // enter right
+      const sx = from.cx - hw, sy = from.cy;
+      const tx = to.cx   + hw, ty = to.cy;
+      const mx = (sx + tx) / 2;
+      return `M ${sx} ${sy} L ${mx} ${sy} L ${mx} ${ty} L ${tx} ${ty}`;
     }
-    const mx = (sx + tx) / 2;
-    return `M ${sx} ${sy} C ${mx} ${sy}, ${mx} ${ty}, ${tx} ${ty}`;
   }
 }
 
-// ── Single diagram node ───────────────────────────────────────────────────────
-function DiagramNode({ service, pos }) {
-  const { name, type, description, warmupUrl } = service;
-  const isAlwaysLive = type === "frontend";
-
-  const [status, setStatus] = useState(
-    isAlwaysLive ? "live" : warmupUrl ? "idle" : "unconfigured"
-  );
-  const [showInfo, setShowInfo] = useState(false);
-
-  const warmupTimerRef = useRef(null);
-  const keepaliveRef = useRef(null);
-  const startTimeRef = useRef(null);
-
-  useEffect(() => {
-    return () => {
-      if (warmupTimerRef.current) clearTimeout(warmupTimerRef.current);
-      if (keepaliveRef.current) clearInterval(keepaliveRef.current);
-    };
-  }, []);
-
-  const attemptPing = useCallback(
-    (url) => {
-      // mode: "no-cors" is intentional: we only need to wake the service, not
-      // read its response. A successful fetch (opaque response) means the server
-      // responded; a TypeError/network error means it is still sleeping.
-      fetch(url, { mode: "no-cors", cache: "no-cache" })
-        .then(() => {
-          setStatus("live");
-          if (!keepaliveRef.current) {
-            keepaliveRef.current = setInterval(() => {
-              fetch(url, { mode: "no-cors", cache: "no-cache" }).catch(() => {});
-            }, KEEPALIVE_INTERVAL);
-          }
-        })
-        .catch(() => {
-          if (Date.now() - startTimeRef.current >= WARMUP_TIMEOUT) {
-            setStatus("failed");
-          } else {
-            warmupTimerRef.current = setTimeout(() => attemptPing(url), POLL_INTERVAL);
-          }
-        });
-    },
-    []
-  );
-
-  const handleClick = useCallback(() => {
-    if (isAlwaysLive || !warmupUrl || status === "warming" || status === "live") return;
-    if (warmupTimerRef.current) clearTimeout(warmupTimerRef.current);
-    startTimeRef.current = Date.now();
-    setStatus("warming");
-    attemptPing(warmupUrl);
-  }, [isAlwaysLive, warmupUrl, status, attemptPing]);
+// ─────────────────────────────────────────────────────────────────────────────
+// Individual SVG node
+// ─────────────────────────────────────────────────────────────────────────────
+function SvgNode({ service, status, onWarmup, isInfoOpen, onToggleInfo }) {
+  const { id, name, type } = service;
+  const pos = service.layout;
+  if (!pos) return null;
 
   const ts = TYPE_STYLE[type] || TYPE_STYLE.backend;
-  const ss = STATUS_STYLE[status];
-  const isClickable = !isAlwaysLive && warmupUrl && status !== "warming" && status !== "live";
+  const isAlwaysLive = type === "frontend";
+  const isClickable  = !isAlwaysLive && service.warmupUrl &&
+                       status !== "warming" && status !== "live";
 
-  const left = pos.cx - NW / 2;
-  const top  = pos.cy - NH / 2;
+  const x = pos.cx - NW / 2;
+  const y = pos.cy - NH / 2;
+
+  // truncate name to fit header
+  const displayName = name.length > 20 ? name.slice(0, 19) + "…" : name;
 
   return (
-    <div
-      onClick={handleClick}
-      style={{
-        position: "absolute",
-        left,
-        top,
-        width: NW,
-        height: NH,
-        backgroundColor: ts.fill,
-        border: `2px solid ${ts.stroke}`,
-        borderRadius: 10,
-        cursor: isClickable ? "pointer" : "default",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "center",
-        padding: "6px 10px 6px 10px",
-        boxSizing: "border-box",
-        userSelect: "none",
-        zIndex: 2,
-        fontFamily: "Poppins, sans-serif",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
-        transition: "box-shadow 0.15s",
-      }}
-      onMouseEnter={(e) => {
-        if (isClickable) e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.15)";
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.07)";
-      }}
-      title={isClickable ? "Click to warm up" : undefined}
+    <g
+      transform={`translate(${x}, ${y})`}
+      onClick={() => isClickable && onWarmup(service)}
+      style={{ cursor: isClickable ? "pointer" : "default" }}
+      role={isClickable ? "button" : undefined}
+      aria-label={isClickable ? `Warm up ${name}` : name}
     >
-      {/* Info toggle */}
-      <button
-        onClick={(e) => { e.stopPropagation(); setShowInfo((v) => !v); }}
-        style={{
-          position: "absolute", top: 5, right: 7,
-          background: "none", border: "none", cursor: "pointer",
-          padding: 0, color: "#9ca3af", lineHeight: 1,
-        }}
-        aria-label="Service info"
-        title="Service description"
+      {/* Drop shadow */}
+      <rect x={2} y={3} width={NW} height={NH} rx={CR} fill="rgba(0,0,0,0.08)" />
+
+      {/* Body background */}
+      <rect width={NW} height={NH} rx={CR} fill={ts.body} stroke={ts.header} strokeWidth={1.5} />
+
+      {/* Colored header strip — clip to preserve rounded top corners only */}
+      <clipPath id={`hclip-${id}`}>
+        <rect width={NW} height={HR + CR} rx={CR} />
+      </clipPath>
+      <rect
+        width={NW} height={HR + CR}
+        clipPath={`url(#hclip-${id})`}
+        fill={ts.header}
+      />
+
+      {/* Service name in header */}
+      <text
+        x={NW / 2} y={HR / 2 + 1}
+        textAnchor="middle" dominantBaseline="middle"
+        fontSize={11} fontWeight="700" fill={ts.headerTxt}
+        fontFamily="Poppins, sans-serif"
       >
-        <Info size={13} />
-      </button>
+        {displayName}
+      </text>
 
-      {/* Service name */}
-      <div style={{ fontSize: 12, fontWeight: 700, color: ts.textColor, paddingRight: 18, lineHeight: 1.3 }}>
-        {name}
-      </div>
-
-      {/* Type tag */}
-      <div style={{ fontSize: 9, color: ts.textColor, opacity: 0.7, fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginTop: 2 }}>
-        {TYPE_LABELS[type] || type}
-      </div>
-
-      {/* Status row */}
-      <div style={{ display: "flex", alignItems: "center", gap: 5, marginTop: 5 }}>
-        <div style={{ width: 7, height: 7, borderRadius: "50%", backgroundColor: ss.dot, flexShrink: 0 }} />
-        <span style={{ fontSize: 10, color: ss.text, fontWeight: 600 }}>{ss.label}</span>
-        {status === "warming" && (
-          <div style={{ flex: 1, height: 3, borderRadius: 2, background: "#fef08a", overflow: "hidden", marginLeft: 2 }}>
-            <div className="animate-pulse" style={{ height: "100%", background: "#eab308", borderRadius: 2, width: "100%" }} />
-          </div>
-        )}
-      </div>
-
-      {/* Info tooltip – floats below the node */}
-      {showInfo && (
-        <div
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            position: "absolute",
-            top: "calc(100% + 8px)",
-            left: 0,
-            width: Math.max(NW, 220),
-            background: "white",
-            border: `1.5px solid ${ts.stroke}`,
-            borderRadius: 8,
-            padding: "8px 10px",
-            fontSize: 11,
-            color: "#4b5563",
-            lineHeight: 1.5,
-            zIndex: 20,
-            boxShadow: "0 6px 18px rgba(0,0,0,0.1)",
-          }}
+      {/* ℹ button in header top-right */}
+      <g
+        transform={`translate(${NW - 11}, 8)`}
+        onClick={(e) => { e.stopPropagation(); onToggleInfo(id); }}
+        style={{ cursor: "pointer" }}
+        role="button"
+        aria-label={`${name} info`}
+      >
+        <circle r={7} fill="rgba(255,255,255,0.25)" stroke={ts.headerTxt} strokeWidth={1} strokeOpacity={0.5} />
+        <text
+          textAnchor="middle" dominantBaseline="middle"
+          fontSize={9} fill={ts.headerTxt}
+          fontFamily="sans-serif"
         >
-          {description}
-        </div>
+          ℹ
+        </text>
+      </g>
+
+      {/* Status dot */}
+      <circle cx={14} cy={HR + (NH - HR) / 2} r={5} fill={STATUS_DOT[status]}>
+        {status === "warming" && (
+          <animate attributeName="opacity" values="0.3;1;0.3" dur="0.9s" repeatCount="indefinite" />
+        )}
+      </circle>
+
+      {/* Status text */}
+      <text
+        x={24} y={HR + (NH - HR) / 2 + 1}
+        dominantBaseline="middle"
+        fontSize={10} fill={ts.bodyTxt}
+        fontFamily="Poppins, sans-serif"
+      >
+        {STATUS_LABEL[status]}
+      </text>
+
+      {/* Type badge (right side of body) */}
+      <text
+        x={NW - 8} y={HR + (NH - HR) / 2 + 1}
+        textAnchor="end" dominantBaseline="middle"
+        fontSize={8.5} fill={ts.header} opacity={0.7}
+        fontFamily="Poppins, sans-serif"
+      >
+        {ts.label}
+      </text>
+
+      {/* Warming pulse bar at bottom */}
+      {status === "warming" && (
+        <rect y={NH - 5} width={NW} height={5} fill="#fde68a">
+          <animate attributeName="opacity" values="0.3;1;0.3" dur="0.9s" repeatCount="indefinite" />
+        </rect>
       )}
-    </div>
+
+      {/* Hover tooltip title */}
+      <title>{isClickable ? `Click to warm up ${name}` : name}</title>
+    </g>
   );
 }
 
-// ── Main diagram component ────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Main ArchitectureDiagram
+// ─────────────────────────────────────────────────────────────────────────────
 function ArchitectureDiagram() {
-  // Build a lookup: id → layout position
-  const layoutMap = useMemo(() => {
+  // Per-service warmup state
+  const [nodeStates, setNodeStates] = useState(() => {
     const m = {};
-    services.forEach((s) => { if (s.layout) m[s.id] = s.layout; });
+    services.forEach((s) => {
+      m[s.id] = s.type === "frontend" ? "live" : s.warmupUrl ? "idle" : "unconfigured";
+    });
     return m;
+  });
+
+  // Which node has its description panel open (id or null)
+  const [openInfo, setOpenInfo] = useState(null);
+
+  const warmupTimers  = useRef({});
+  const keepaliveTimers = useRef({});
+  const startTimes    = useRef({});
+
+  useEffect(() => {
+    return () => {
+      Object.values(warmupTimers.current).forEach(clearTimeout);
+      Object.values(keepaliveTimers.current).forEach(clearInterval);
+    };
   }, []);
 
-  // Derive arrow edges from dependency declarations
+  const attemptPing = useCallback((id, url) => {
+    // mode: "no-cors" is intentional: we only need to wake the service, not
+    // read its response. A successful fetch (opaque response) means the server
+    // responded; a TypeError/network error means it is still sleeping.
+    fetch(url, { mode: "no-cors", cache: "no-cache" })
+      .then(() => {
+        setNodeStates((s) => ({ ...s, [id]: "live" }));
+        if (!keepaliveTimers.current[id]) {
+          keepaliveTimers.current[id] = setInterval(() => {
+            fetch(url, { mode: "no-cors", cache: "no-cache" }).catch(() => {});
+          }, KEEPALIVE_INTERVAL);
+        }
+      })
+      .catch(() => {
+        if (Date.now() - startTimes.current[id] >= WARMUP_TIMEOUT) {
+          setNodeStates((s) => ({ ...s, [id]: "failed" }));
+        } else {
+          warmupTimers.current[id] = setTimeout(() => attemptPing(id, url), POLL_INTERVAL);
+        }
+      });
+  }, []);
+
+  const handleWarmup = useCallback((svc) => {
+    const { id, warmupUrl } = svc;
+    setNodeStates((prev) => {
+      if (prev[id] === "warming" || prev[id] === "live") return prev;
+      if (warmupTimers.current[id]) clearTimeout(warmupTimers.current[id]);
+      startTimes.current[id] = Date.now();
+      setTimeout(() => attemptPing(id, warmupUrl), 0);
+      return { ...prev, [id]: "warming" };
+    });
+  }, [attemptPing]);
+
+  const handleToggleInfo = useCallback((id) => {
+    setOpenInfo((prev) => (prev === id ? null : id));
+  }, []);
+
+  // Derive arrow edges from dependency declarations in servicesConfig.js
   const edges = useMemo(() => {
+    const byId = Object.fromEntries(services.map((s) => [s.id, s]));
     const result = [];
     services.forEach((svc) => {
-      const from = layoutMap[svc.id];
-      if (!from) return;
+      if (!svc.layout) return;
       (svc.dependencies || []).forEach((depId) => {
-        const to = layoutMap[depId];
-        if (to) result.push({ from, to, key: `${svc.id}→${depId}` });
+        const dep = byId[depId];
+        if (dep?.layout) {
+          result.push({ from: svc.layout, to: dep.layout, key: `${svc.id}→${depId}` });
+        }
       });
     });
     return result;
-  }, [layoutMap]);
+  }, []);
+
+  const infoService = openInfo ? services.find((s) => s.id === openInfo) : null;
+  const infoPos     = infoService?.layout;
+
+  // Position the info panel to the right of the node, clamped inside canvas
+  const infoPanelX = infoPos ? Math.min(infoPos.cx + NW / 2 + 10, W - 218) : 0;
+  const infoPanelY = infoPos ? Math.max(infoPos.cy - NH / 2, 8) : 0;
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-gray-100 bg-gray-50 p-2">
-      {/* Scroll wrapper – allows diagram to scroll horizontally on small screens */}
-      <div style={{ position: "relative", width: W, height: H }} className="mx-auto">
+    <div className="overflow-x-auto rounded-xl border border-gray-200 bg-gray-50 p-2 shadow-sm">
+      <svg
+        width={W}
+        height={H}
+        viewBox={`0 0 ${W} ${H}`}
+        style={{ display: "block", margin: "0 auto", maxWidth: "100%" }}
+        onClick={() => setOpenInfo(null)}
+      >
+        <defs>
+          {/* Arrowhead marker */}
+          <marker id="ah" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+            <path d="M 0 0 L 9 3.5 L 0 7 Z" fill="#94a3b8" />
+          </marker>
+        </defs>
 
-        {/* ── SVG layer: swim-lane backgrounds + arrows ── */}
-        <svg
-          width={W}
-          height={H}
-          style={{ position: "absolute", top: 0, left: 0, pointerEvents: "none" }}
-        >
-          <defs>
-            {/* Arrowhead marker */}
-            <marker id="arrowhead" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
-              <path d="M0,0 L8,3 L0,6 Z" fill="#94a3b8" />
-            </marker>
-          </defs>
-
-          {/* Swim-lane backgrounds */}
-          {LANES.map((lane) => (
-            <g key={lane.label}>
-              <rect
-                x={10} y={lane.y1}
-                width={W - 20} height={lane.y2 - lane.y1}
-                rx={8} fill={lane.color} stroke="#e2e8f0" strokeWidth={1}
-              />
-              <text
-                x={20} y={lane.y1 + 14}
-                fontSize={10} fill="#94a3b8"
-                fontFamily="Poppins, sans-serif" fontWeight="600"
-                textAnchor="start" style={{ textTransform: "uppercase", letterSpacing: "0.06em" }}
-              >
-                {lane.label}
-              </text>
-            </g>
-          ))}
-
-          {/* Arrows */}
-          {edges.map(({ from, to, key }) => (
-            <path
-              key={key}
-              d={arrowPath(from, to)}
-              stroke="#94a3b8"
-              strokeWidth={1.5}
-              fill="none"
-              strokeDasharray="none"
-              markerEnd="url(#arrowhead)"
+        {/* ── Swim-lane backgrounds ── */}
+        {LANES.map((lane) => (
+          <g key={lane.label}>
+            <rect
+              x={8} y={lane.y1} width={W - 16} height={lane.y2 - lane.y1}
+              rx={8} fill={lane.fill} stroke={lane.stroke} strokeWidth={1}
             />
-          ))}
-        </svg>
+            {/* Lane label */}
+            <text
+              x={22} y={lane.y1 + 15}
+              fontSize={9} fill="#94a3b8"
+              fontFamily="Poppins, sans-serif" fontWeight="700"
+              letterSpacing="0.08em"
+            >
+              {lane.label.toUpperCase()}
+            </text>
+          </g>
+        ))}
 
-        {/* ── Node layer ── */}
-        {services.map((svc) => {
-          const pos = layoutMap[svc.id];
-          if (!pos) return null;
-          return <DiagramNode key={svc.id} service={svc} pos={pos} />;
-        })}
-      </div>
+        {/* ── Arrows ── */}
+        {edges.map(({ from, to, key }) => (
+          <path
+            key={key}
+            d={elbowPath(from, to)}
+            stroke="#94a3b8"
+            strokeWidth={1.5}
+            fill="none"
+            strokeLinejoin="round"
+            markerEnd="url(#ah)"
+          />
+        ))}
+
+        {/* ── Service nodes ── */}
+        {services.map((svc) => (
+          <SvgNode
+            key={svc.id}
+            service={svc}
+            status={nodeStates[svc.id]}
+            onWarmup={handleWarmup}
+            isInfoOpen={openInfo === svc.id}
+            onToggleInfo={handleToggleInfo}
+          />
+        ))}
+
+        {/* ── Description panel (foreignObject) ── */}
+        {infoService && infoPos && (
+          <foreignObject
+            x={infoPanelX}
+            y={infoPanelY}
+            width={210}
+            height={140}
+            style={{ overflow: "visible" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              xmlns="http://www.w3.org/1999/xhtml"
+              style={{
+                background: "white",
+                border: "1.5px solid #e2e8f0",
+                borderRadius: 8,
+                padding: "9px 11px",
+                fontSize: 11,
+                color: "#374151",
+                lineHeight: 1.55,
+                boxShadow: "0 6px 18px rgba(0,0,0,0.12)",
+                width: 210,
+                boxSizing: "border-box",
+              }}
+            >
+              <strong style={{ display: "block", marginBottom: 5, fontSize: 12, color: "#111827" }}>
+                {infoService.name}
+              </strong>
+              {infoService.description}
+            </div>
+          </foreignObject>
+        )}
+      </svg>
 
       {/* ── Legend ── */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 px-3 pt-2 pb-1">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 pt-2 pb-1 border-t border-gray-100">
         {Object.entries(TYPE_STYLE).map(([type, style]) => (
           <div key={type} className="flex items-center gap-1.5">
-            <div style={{ width: 10, height: 10, borderRadius: 3, background: style.fill, border: `1.5px solid ${style.stroke}` }} />
-            <span className="text-xs text-gray-400">{TYPE_LABELS[type]}</span>
+            <div style={{
+              width: 13, height: 13, borderRadius: 3,
+              background: style.body, border: `2px solid ${style.header}`,
+            }} />
+            <span className="text-xs text-gray-400">{style.label}</span>
           </div>
         ))}
-        <div className="ml-auto flex items-center gap-3 text-xs text-gray-400">
-          <span>Click a node to warm up · ℹ for description</span>
-        </div>
+        <span className="ml-auto text-xs text-gray-400 italic">
+          Click node to warm up &middot; ℹ for description
+        </span>
       </div>
     </div>
   );

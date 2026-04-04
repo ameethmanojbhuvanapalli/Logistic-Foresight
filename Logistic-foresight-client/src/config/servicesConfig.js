@@ -39,7 +39,7 @@ const services = [
     warmupUrl: null,
     healthUrl: null,
     dependencies: ["packing", "delivery"],
-    layout: { cx: 400, cy: 62 },
+    layout: { cx: 430, cy: 65 },
   },
   {
     id: "packing",
@@ -54,7 +54,7 @@ const services = [
       ? `${import.meta.env.VITE_PACKING_SERVICE_URL}/actuator/health`
       : null,
     dependencies: ["ml", "ksqldb-server"],
-    layout: { cx: 215, cy: 187 },
+    layout: { cx: 215, cy: 196 },
   },
   {
     id: "delivery",
@@ -69,7 +69,7 @@ const services = [
       ? `${import.meta.env.VITE_DELIVERY_SERVICE_URL}/actuator/health`
       : null,
     dependencies: ["ml", "ksqldb-server"],
-    layout: { cx: 585, cy: 187 },
+    layout: { cx: 645, cy: 196 },
   },
   {
     id: "ml",
@@ -84,7 +84,7 @@ const services = [
       ? `${import.meta.env.VITE_ML_SERVICE_URL}/health`
       : null,
     dependencies: [],
-    layout: { cx: 215, cy: 355 },
+    layout: { cx: 215, cy: 378 },
   },
   {
     id: "ksqldb-server",
@@ -99,7 +99,7 @@ const services = [
       ? `${import.meta.env.VITE_KSQLDB_SERVER_URL}/healthcheck`
       : null,
     dependencies: [],
-    layout: { cx: 585, cy: 355 },
+    layout: { cx: 645, cy: 360 },
   },
   {
     id: "ksqldb-studio",
@@ -112,7 +112,7 @@ const services = [
       : null,
     healthUrl: null,
     dependencies: ["ksqldb-server"],
-    layout: { cx: 585, cy: 448 },
+    layout: { cx: 645, cy: 468 },
   },
 ];
 
