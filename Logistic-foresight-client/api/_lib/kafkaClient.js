@@ -1,6 +1,23 @@
 import { Kafka } from 'kafkajs';
+import avro from 'avsc';
 
 let _producer = null;
+
+// Avro schema matching your Order structure
+const orderSchema = {
+  type: 'record',
+  name: 'Order',
+  fields: [
+    { name: 'OrderId', type: 'long' },
+    { name: 'ItemQty', type: 'int' },
+    { name: 'Latitude', type: 'double' },
+    { name: 'Longitude', type: 'double' },
+    { name: 'OrderDT', type: 'string' },
+    { name: 'OrderStatus', type: 'int' },
+  ],
+};
+
+const encoder = avro.createEncoder(orderSchema);
 
 async function getProducer() {
   if (!_producer) {
@@ -22,11 +39,27 @@ async function getProducer() {
 
 export async function publishOrders(orders, topic) {
   const producer = await getProducer();
+  
+  const messages = orders.map((o) => {
+    // Encode to Avro
+    const avroData = encoder.encode(o);
+    
+    // Confluent format: [magic byte (1)] + [schema ID (4)] + [avro data]
+    const buffer = Buffer.alloc(5 + avroData.length);
+    buffer[0] = 0; // Magic byte
+    buffer.writeInt32BE(1, 1); // Schema ID (change if your registry uses a different ID)
+    avroData.copy(buffer, 5);
+    
+    return {
+      key: String(o.OrderId),
+      value: buffer,
+    };
+  });
+
   await producer.send({
     topic,
-    messages: orders.map((o) => ({
-      key:   String(o.OrderId),
-      value: JSON.stringify(o),
-    })),
+    messages,
   });
+  
+  console.log(`Published ${orders.length} Avro-encoded orders to ${topic}`);
 }
