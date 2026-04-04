@@ -258,7 +258,7 @@ const About = () => {
             You can view and contribute to the project’s source code on GitHub:
           </p>
           <a 
-            href="https://github.com/your-repository-link"
+            href="https://github.com/ameethmanojbhuvanapalli/Logistic-Foresight"
             className="text-[#ff8c8c] hover:underline"
             target="_blank"
             rel="noopener noreferrer"
