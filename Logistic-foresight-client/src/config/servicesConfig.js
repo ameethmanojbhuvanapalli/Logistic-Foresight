@@ -19,12 +19,15 @@ export const KEEPALIVE_INTERVAL =
 // Service definitions
 // Fields:
 //   id          – unique string identifier
-//   name        – display name shown on the card
+//   name        – display name shown on the diagram node
 //   type        – "frontend" | "backend" | "ml" | "db" | "tool"
 //   description – shown when user clicks the info (ℹ) button
 //   warmupUrl   – URL to hit in order to wake the service; null = no warmup
 //   healthUrl   – optional separate health-check URL (falls back to warmupUrl)
-//   dependencies– array of other service ids this service depends on
+//   dependencies– array of other service ids this service calls/depends on
+//                 (used to draw arrows in the architecture diagram)
+//   layout      – { cx, cy } centre-point of the node in the SVG canvas
+//                 (canvas is 800 × 490 px; change cx/cy to move a node)
 // ─────────────────────────────────────────────────────────────────────────────
 const services = [
   {
@@ -35,7 +38,8 @@ const services = [
       "The Vite + React dashboard you are looking at right now. Visualizes real-time counter predictions, order forecasts, and delivery routes. Always live — no warmup required.",
     warmupUrl: null,
     healthUrl: null,
-    dependencies: [],
+    dependencies: ["packing", "delivery"],
+    layout: { cx: 400, cy: 62 },
   },
   {
     id: "packing",
@@ -50,6 +54,7 @@ const services = [
       ? `${import.meta.env.VITE_PACKING_SERVICE_URL}/actuator/health`
       : null,
     dependencies: ["ml", "ksqldb-server"],
+    layout: { cx: 215, cy: 187 },
   },
   {
     id: "delivery",
@@ -64,6 +69,7 @@ const services = [
       ? `${import.meta.env.VITE_DELIVERY_SERVICE_URL}/actuator/health`
       : null,
     dependencies: ["ml", "ksqldb-server"],
+    layout: { cx: 585, cy: 187 },
   },
   {
     id: "ml",
@@ -78,6 +84,7 @@ const services = [
       ? `${import.meta.env.VITE_ML_SERVICE_URL}/health`
       : null,
     dependencies: [],
+    layout: { cx: 215, cy: 355 },
   },
   {
     id: "ksqldb-server",
@@ -92,6 +99,7 @@ const services = [
       ? `${import.meta.env.VITE_KSQLDB_SERVER_URL}/healthcheck`
       : null,
     dependencies: [],
+    layout: { cx: 585, cy: 355 },
   },
   {
     id: "ksqldb-studio",
@@ -104,6 +112,7 @@ const services = [
       : null,
     healthUrl: null,
     dependencies: ["ksqldb-server"],
+    layout: { cx: 585, cy: 448 },
   },
 ];
 
