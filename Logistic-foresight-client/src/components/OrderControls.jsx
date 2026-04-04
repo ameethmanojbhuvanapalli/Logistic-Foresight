@@ -59,7 +59,7 @@ export default function OrderControls({ onOrdersGenerated, onRegenerated }) {
               max="3"
               placeholder="1–3"
               defaultValue={2}
-              value={generateCount}
+              value={generateCount || 2}
               onChange={(e) => setGenerateCount(e.target.value)}
               disabled={generateStatus === 'loading'}
             />
@@ -92,8 +92,7 @@ export default function OrderControls({ onOrdersGenerated, onRegenerated }) {
               type="number"
               min="150000"
               placeholder="min 150000"
-              defaultValue={150000}
-              value={regenerateCount}
+              value={regenerateCount || 150000}
               onChange={(e) => setRegenerateCount(e.target.value)}
               disabled={regenerateStatus === 'loading'}
             />
