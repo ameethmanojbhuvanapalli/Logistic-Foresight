@@ -40,26 +40,67 @@ function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
-export function generateOrders(count) {
-  // Auto-load areas on first call
-  if (!areasLoaded) {
-    loadAreasFromCSV();
+export function generateOrders(count, options = {}) {
+  if (!areasLoaded) loadAreasFromCSV();
+
+  const {
+    mode = 'realtime', // 'realtime' | 'historical'
+    monthsBack = 3
+  } = options;
+
+  const now = new Date();
+  const past = new Date();
+  past.setMonth(past.getMonth() - monthsBack);
+
+  function randomDate(start, end) {
+    return new Date(start.getTime() + Math.random() * (end.getTime() - start.getTime()));
   }
-  
-  if (BANGALORE_AREAS.length === 0) {
-    throw new Error('Areas not loaded. Check CSV file path.');
+
+  function getDemandMultiplier(date) {
+    const hour = date.getHours();
+    const day = date.getDay();
+
+    let m = 1;
+
+    // hourly pattern
+    if (hour >= 12 && hour <= 14) m *= 2;
+    else if (hour >= 18 && hour <= 22) m *= 3;
+    else if (hour >= 0 && hour <= 6) m *= 0.3;
+
+    // weekend boost
+    if (day === 0 || day === 6) m *= 1.4;
+
+    // growth trend
+    const progress = (date - past) / (now - past);
+    m *= (1 + progress * 0.5);
+
+    return m;
   }
-  
-  const now = Date.now();
+
   return Array.from({ length: count }, (_, i) => {
     const area = BANGALORE_AREAS[randomInt(0, BANGALORE_AREAS.length - 1)];
+
+    const orderDate =
+      mode === 'historical'
+        ? randomDate(past, now)
+        : new Date();
+
+    const multiplier = mode === 'historical'
+      ? getDemandMultiplier(orderDate)
+      : 1;
+
+    const itemQty = Math.max(
+      1,
+      Math.floor((Math.random() * 3 + 1) * multiplier)
+    );
+
     return {
-      ORDERID: now + i,        // Changed from OrderId
-      ITEMQTY: randomInt(1, 11), // Changed from ItemQty
-      LATITUDE: area.lat,       // Changed from Latitude
-      LONGITUDE: area.lng,      // Changed from Longitude
-      ORDERDT: new Date().toISOString(), // Changed from OrderDT
-      ORDERSTATUS: 1,           // Changed from OrderStatus
+      ORDERID: Date.now() + i,
+      ITEMQTY: itemQty,
+      LATITUDE: area.lat,
+      LONGITUDE: area.lng,
+      ORDERDT: orderDate, // ✅ always Date object
+      ORDERSTATUS: 1
     };
   });
 }

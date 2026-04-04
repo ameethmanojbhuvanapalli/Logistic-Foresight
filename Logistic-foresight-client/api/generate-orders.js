@@ -13,7 +13,9 @@ export default async function handler(req, res) {
   count = (!count || count === '') ? Math.floor(Math.random() * 10) + 1 : Math.min(Math.max(parseInt(count, 10), 1), 10);
 
   try {
-    const orders = generateOrders(count);
+    const orders = generateOrders(count, {
+      mode: 'realtime'
+    });
     await publishOrders(orders, TOPIC);
     
     // Return success without the encoded binary data

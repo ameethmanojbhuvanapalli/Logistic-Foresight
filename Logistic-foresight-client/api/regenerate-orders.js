@@ -1,18 +1,30 @@
 import { generateOrders }      from './_lib/orderGenerator.js';
 import { getOrdersCollection } from './_lib/mongoClient.js';
 
+function getMonthsBack(count) {
+  const ORDERS_PER_DAY = 2000;
+  const days = Math.ceil(count / ORDERS_PER_DAY);
+  return Math.ceil(days / 30);
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method Not Allowed' });
 
   if (!process.env.MONGO_URI) return res.status(500).json({ error: 'Missing MONGO_URI' });
 
-  let count = req.body?.count;
-  count = (!count || count === '') ? 150000 : Math.min(Math.max(parseInt(count, 10), 1), 150000);
+  let count = parseInt(req.body?.count, 10);
+
+  if (!count || isNaN(count)) count = 150000;
+
+  count = Math.max(count, 150000);
 
   try {
     const collection = await getOrdersCollection();
     const deleteResult = await collection.deleteMany({});
-    const orders = generateOrders(count);
+    const orders = generateOrders(count, {
+      mode: 'historical',
+      monthsBack: getMonthsBack(count)
+    });
     const docs = orders.map(o => ({
       ORDERID: o.ORDERID,           // Changed
       ITEMQTY: o.ITEMQTY,           // Changed
