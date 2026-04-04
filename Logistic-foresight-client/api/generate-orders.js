@@ -15,7 +15,14 @@ export default async function handler(req, res) {
   try {
     const orders = generateOrders(count);
     await publishOrders(orders, TOPIC);
-    return res.status(200).json({ success: true, count: orders.length, topic: TOPIC, orders });
+    
+    // Return success without the encoded binary data
+    return res.status(200).json({ 
+      success: true, 
+      count: orders.length, 
+      topic: TOPIC,
+      message: `Published ${orders.length} orders to ${TOPIC}`
+    });
   } catch (err) {
     return res.status(500).json({ error: 'Failed to publish', message: err.message });
   }
